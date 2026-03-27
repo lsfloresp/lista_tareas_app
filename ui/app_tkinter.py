@@ -1,4 +1,6 @@
 import tkinter as tk
+from tkinter import messagebox
+from datetime import datetime
 from modelos.tarea import Tarea
 from servicios.tarea_servicio import TareaServicio
 
@@ -6,43 +8,91 @@ from servicios.tarea_servicio import TareaServicio
 class AppTkinter:
     def __init__(self, root):
         self.root = root
-        self.root.title("To-Do List Profesional - Luis Flores")
-        self.root.geometry("450x550")
+        self.root.title("Agenda Digital Profesional - Luis Flores")
+        self.root.geometry("650x750")
         self.servicio = TareaServicio()
 
-        # --- Componentes de la Interfaz ---
-        tk.Label(root, text="Descripción de la Tarea:", font=("Arial", 10, "bold")).pack(pady=5)
-        self.entrada = tk.Entry(root, width=40, font=("Arial", 11))
-        self.entrada.pack(pady=5)
-        self.entrada.focus()
+        # --- MATERIA ---
+        tk.Label(root, text="Ingrese Materia:", font=("Arial", 10, "bold")).pack(pady=(10, 0))
+        self.entrada_materia = tk.Entry(root, width=50, font=("Arial", 11))
+        self.entrada_materia.pack(pady=5)
+        self.entrada_materia.focus()
 
-        # EVENTO TECLADO (<Return>): Permite añadir tareas con la tecla Enter.
-        # Lógica: Mejora la fluidez al evitar el uso constante del ratón.
-        self.entrada.bind("<Return>", lambda e: self.manejador_agregar())
+        # --- TÍTULO TAREA (DESCRIPCIÓN) ---
+        tk.Label(root, text="Título Tarea (Descripción):", font=("Arial", 10, "bold")).pack(pady=(5, 0))
+        self.entrada_desc = tk.Entry(root, width=50, font=("Arial", 11))
+        self.entrada_desc.pack(pady=5)
 
-        tk.Button(root, text="Añadir Tarea", command=self.manejador_agregar).pack(pady=5)
+        # --- PRIORIDAD ---
+        tk.Label(root, text="Prioridad (Alta / Media / Baja):", font=("Arial", 10, "bold")).pack(pady=(5, 0))
+        self.entrada_prio = tk.Entry(root, width=50, font=("Arial", 11))
+        self.entrada_prio.insert(0, "Media")
+        self.entrada_prio.pack(pady=5)
 
-        # Listbox para visualización de tareas
-        self.lista_box = tk.Listbox(root, width=55, height=15, font=("Arial", 10))
+        # --- FECHA ---
+        tk.Label(root, text="Fecha de entrega (AAAA-MM-DD):", font=("Arial", 10, "bold")).pack(pady=(5, 0))
+        self.entrada_fecha = tk.Entry(root, width=50, font=("Arial", 11))
+        self.entrada_fecha.insert(0, datetime.now().strftime("%Y-%m-%d"))  # Fecha actual por defecto
+        self.entrada_fecha.pack(pady=5)
+
+        self.entrada_fecha.bind("<Return>", lambda e: self.manejador_agregar())
+
+        # Botón Principal
+        tk.Button(root, text="Añadir a la Agenda", font=("Arial", 10, "bold"),
+                  bg="#2196F3", fg="white", width=30, command=self.manejador_agregar).pack(pady=15)
+
+        # Listbox para visualización
+        self.lista_box = tk.Listbox(root, width=85, height=18, font=("Consolas", 9))
         self.lista_box.pack(pady=10, padx=20)
 
-        # EVENTO RATÓN (<Double-1>): Doble clic para completar tarea.
-        # Lógica: Se implementa como un atajo intuitivo basado en estándares de escritorio.
         self.lista_box.bind("<Double-1>", lambda e: self.manejador_completar())
 
-        # Botones de estado con colores estándar (Verde/Rojo)
-        tk.Button(root, text="Marcar Completada", bg="#C8E6C9", command=self.manejador_completar).pack(pady=2)
-        tk.Button(root, text="Eliminar", bg="#FFCDD2", command=self.manejador_eliminar).pack(pady=5)
+        # Botones de gestión
+        tk.Button(root, text="Marcar como Finalizada", bg="#C8E6C9", width=30, command=self.manejador_completar).pack(
+            pady=2)
+        tk.Button(root, text="Eliminar de la Agenda", bg="#FFCDD2", width=30, command=self.manejador_eliminar).pack(
+            pady=5)
 
         self.refrescar_lista()
 
+    def validar_fecha(self, fecha_str):
+        """Verifica si la fecha tiene el formato correcto AAAA-MM-DD."""
+        try:
+            datetime.strptime(fecha_str, '%Y-%m-%d')
+            return True
+        except ValueError:
+            return False
+
     def manejador_agregar(self):
-        texto = self.entrada.get().strip()
-        if texto:
-            nueva = Tarea(texto)
-            self.servicio.añadir_tarea(nueva)
-            self.entrada.delete(0, tk.END)
-            self.refrescar_lista()
+        materia = self.entrada_materia.get().strip()
+        desc = self.entrada_desc.get().strip()
+        prio_raw = self.entrada_prio.get().strip().lower()
+        fecha = self.entrada_fecha.get().strip()
+
+        # 1. Validación de campos vacíos
+        if not materia or not desc or not fecha:
+            messagebox.showwarning("Atención", "Todos los campos son obligatorios.")
+            return
+
+        # 2. Validación de Prioridad Estricta
+        prioridades_validas = ["alta", "media", "baja"]
+        if prio_raw not in prioridades_validas:
+            messagebox.showerror("Error de Prioridad", "Escriba solo: Alta, Media o Baja.")
+            return
+
+        # 3. Validación de Fecha Estricta
+        if not self.validar_fecha(fecha):
+            messagebox.showerror("Error de Fecha", "Formato incorrecto. Use: AAAA-MM-DD\nEjemplo: 2026-03-27")
+            return
+
+        # Si todo es válido, agregamos
+        self.servicio.añadir_tarea(materia, desc, prio_raw.capitalize(), fecha)
+
+        # Limpieza
+        self.entrada_materia.delete(0, tk.END)
+        self.entrada_desc.delete(0, tk.END)
+        self.entrada_materia.focus()
+        self.refrescar_lista()
 
     def manejador_completar(self):
         seleccion = self.lista_box.curselection()
@@ -57,15 +107,30 @@ class AppTkinter:
             self.refrescar_lista()
 
     def refrescar_lista(self):
-        """Actualiza la lista con feedback visual (Verde para completado, Rojo pendiente)."""
         self.lista_box.delete(0, tk.END)
         for i, tarea in enumerate(self.servicio.obtener_todas()):
+
             if tarea.completada:
-                texto = f"✔ [HECHO] {tarea.descripcion}"
-                bg, fg = "#E8F5E9", "#2E7D32"  # Colores verdes suaves
+                prefijo = "✔ [HECHO]"
+                texto = f"{prefijo} {tarea.titulo}: {tarea.descripcion} - Finalizada"
             else:
-                texto = f"✖ [PENDIENTE] {tarea.descripcion}"
-                bg, fg = "#FFEBEE", "#C62828"  # Colores rojos suaves
+                prefijo = f"✖ [{tarea.prioridad.upper()}]"
+                texto = f"{prefijo} {tarea.titulo}: {tarea.descripcion} - Vence: {tarea.fecha}"
 
             self.lista_box.insert(tk.END, texto)
+
+            # Lógica de colores según prioridad
+            if tarea.completada:
+                bg, fg = "#E8F5E9", "#2E7D32"
+            else:
+                prio = tarea.prioridad.lower().strip()
+                if prio == "alta":
+                    bg, fg = "#FFEBEE", "#B71C1C"
+                elif prio == "media":
+                    bg, fg = "#FFFDE7", "#FBC02D"
+                elif prio == "baja":
+                    bg, fg = "#E3F2FD", "#1976D2"
+                else:
+                    bg, fg = "white", "black"
+
             self.lista_box.itemconfig(i, bg=bg, fg=fg)
